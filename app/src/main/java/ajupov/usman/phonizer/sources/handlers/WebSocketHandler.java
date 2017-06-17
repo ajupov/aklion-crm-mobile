@@ -5,6 +5,8 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.Handler;
 import android.widget.Toast;
+
+import org.java_websocket.WebSocket;
 import org.java_websocket.client.WebSocketClient;
 import org.java_websocket.drafts.Draft_17;
 import org.java_websocket.handshake.ServerHandshake;
@@ -17,15 +19,18 @@ import ajupov.usman.phonizer.sources.models.WebSocketMessage;
 public class WebSocketHandler {
     private static WebSocketClient webSocketClient;
     private static Handler handler;
+    private static URI uri;
+    private static Context context;
 
-    public static void initialize(String uriString, final Context context) {
+    public static void initialize(String uriString, final Context appContext) {
+        context = appContext;
         handler = new Handler(context.getMainLooper());
+        uri = UriHelper.convertFromString(uriString);
 
-        URI uri = UriHelper.convertFromString(uriString);
-        if (uri == null) {
-            return;
-        }
+        createWebSocket();
+    }
 
+    public static void createWebSocket(){
         webSocketClient = new WebSocketClient(uri, new Draft_17()) {
             @Override
             public void onOpen(ServerHandshake handshakeData) {
@@ -72,7 +77,8 @@ public class WebSocketHandler {
                 runOnUiThread(new Runnable() {
                     @Override
                     public void run() {
-                        Toast.makeText(context, "Отключено", Toast.LENGTH_SHORT).show();
+                        Toast.makeText(context, "Отключено. Переподключаемся", Toast.LENGTH_SHORT).show();
+                        createWebSocket();
                     }
                 });
             }
@@ -82,7 +88,8 @@ public class WebSocketHandler {
                 runOnUiThread(new Runnable() {
                     @Override
                     public void run() {
-                        Toast.makeText(context, "Ошибка", Toast.LENGTH_SHORT).show();
+                        Toast.makeText(context, "Ошибка. Переподключаемся", Toast.LENGTH_SHORT).show();
+                        createWebSocket();
                     }
                 });
             }
@@ -93,6 +100,10 @@ public class WebSocketHandler {
 
     public static void sendToServer(WebSocketMessage message){
         try {
+            if(webSocketClient.getReadyState() != WebSocket.READYSTATE.OPEN){
+                createWebSocket();
+            }
+
             webSocketClient.send(message.toJsonString());
         }
         catch (Exception e){
